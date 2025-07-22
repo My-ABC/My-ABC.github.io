@@ -20,6 +20,7 @@ jobs:
           curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/users/$USERNAME/repos?per_page=100" \
             | jq -r '.[].full_name' > repos.txt
+          cat repos.json | jq '.stargazers_count'  # 调试输出
           
           # 为每个仓库获取详细数据
           mkdir -p public/repos
