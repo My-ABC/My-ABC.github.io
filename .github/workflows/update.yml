@@ -16,24 +16,43 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           USERNAME: "My-ABC"  # 👈 修改为你的用户名
         run: |
-          # 获取用户所有公开仓库
+          # 安装必要工具
+          sudo apt-get install -y jq
+
+          # 1. 获取所有公开仓库列表
+          echo "正在获取仓库列表..."
           curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/users/$USERNAME/repos?per_page=100" \
-            | jq -r '.[].full_name' > repos.txt
-          cat repos.json | jq '.stargazers_count'  # 调试输出
-          
-          # 为每个仓库获取详细数据
+            > repos_raw.json
+
+          # 调试：检查API返回数据
+          echo "API返回数据示例："
+          jq '.[0] | {name, full_name, stargazers_count}' repos_raw.json
+
+          # 2. 提取仓库名称
+          jq -r '.[].full_name' repos_raw.json > repos.txt
+          echo "找到的仓库："
+          cat repos.txt
+
+          # 3. 为每个仓库获取详细数据
           mkdir -p public/repos
           while read -r repo; do
-            echo "Processing $repo..."
+            echo "正在处理仓库：$repo"
             curl -s -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/$repo" > "public/repos/${repo//\//_}.json"
+            
+            # 调试：检查单个仓库数据
+            echo "仓库数据预览："
+            jq '{name, stargazers_count, language}' "public/repos/${repo//\//_}.json"
           done < repos.txt
-          
-          # 生成索引文件
-          echo '{"repos":[' > public/projects.json
-          paste -sd, public/repos/*.json >> public/projects.json
-          echo ']}' >> public/projects.json
+
+          # 4. 生成合并的JSON文件
+          echo "正在生成projects.json..."
+          jq -s '.' public/repos/*.json > public/projects.json
+
+          # 5. 最终验证
+          echo "生成的projects.json内容预览："
+          jq '.[0] | {name, stargazers_count}' public/projects.json
           
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
