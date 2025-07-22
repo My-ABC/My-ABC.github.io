@@ -1,0 +1,40 @@
+# .github/workflows/update-projects.yml
+name: Auto Update Projects
+on:
+  schedule:
+    - cron: '0 * * * *'  # 每小时更新一次
+  workflow_dispatch:     # 支持手动触发
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Fetch ALL repositories
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          USERNAME: "My-ABC"  # 👈 修改为你的用户名
+        run: |
+          # 获取用户所有公开仓库
+          curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/users/$USERNAME/repos?per_page=100" \
+            | jq -r '.[].full_name' > repos.txt
+          
+          # 为每个仓库获取详细数据
+          mkdir -p public/repos
+          while read -r repo; do
+            echo "Processing $repo..."
+            curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$repo" > "public/repos/${repo//\//_}.json"
+          done < repos.txt
+          
+          # 生成索引文件
+          echo '{"repos":[' > public/projects.json
+          paste -sd, public/repos/*.json >> public/projects.json
+          echo ']}' >> public/projects.json
+          
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
