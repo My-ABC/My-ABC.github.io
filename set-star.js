@@ -1,30 +1,43 @@
 document.addEventListener('DOMContentLoaded', function() {
-  fetch('/projects.json')
-    .then(res => res.json())
-    .then(data => {
-      data.repos.forEach(repoData => {
-        const repoCard = document.querySelector(`.project-card[data-repo="${repoData.full_name}"]`);
-        if (!repoCard) return;
-        
-        // 更新 star 数
-        const starSpan = repoCard.querySelector('.star-count');
-        if (starSpan) starSpan.textContent = repoData.stargazers_count || 0;
-        
-        // 更新语言（需要额外请求 /languages）
-        const langSpan = repoCard.querySelector('.lang');
-        if (langSpan) {
-          langSpan.textContent = repoData.language || '未知';
-          
-          // 如果需要显示所有语言（异步加载）
-          fetch(`/repos/${repoData.full_name.replace('/', '_')}.json`)
-            .then(res => res.json())
-            .then(details => {
-              if (details.languages) {
-                const langs = Object.keys(details.languages);
-                langSpan.textContent = langs.join('/') || '未知';
-              }
-            });
+  document.querySelectorAll('.project-card[data-repo]').forEach(function(card) {
+    const repo = card.getAttribute('data-repo');
+    if (!repo) return;
+    fetch(`https://api.github.com/repos/${repo}`)
+      .then(res => res.json())
+      .then(data => {
+        // 更新 star 数量
+        const starSpan = card.querySelector('.star-count');
+        if (starSpan) {
+          if (typeof data.stargazers_count === 'number') {
+            starSpan.textContent = data.stargazers_count;
+          } else {
+            starSpan.textContent = 0;
+          }
         }
+        // 获取所有语言
+        fetch(`https://api.github.com/repos/${repo}/languages`)
+          .then(res => res.json())
+          .then(langs => {
+            const langSpan = card.querySelector('.lang');
+            if (langSpan) {
+              let langList = Object.keys(langs);
+              // 主语言优先
+              if (data.language && langList.includes(data.language)) {
+                langList = [data.language, ...langList.filter(l => l !== data.language)];
+              }
+              langSpan.textContent = langList.length ? langList.join('/') : (data.language || '未知');
+            }
+          })
+          .catch(() => {
+            const langSpan = card.querySelector('.lang');
+            if (langSpan) langSpan.textContent = data.language || '未知';
+          });
+      })
+      .catch(() => {
+        const starSpan = card.querySelector('.star-count');
+        if (starSpan) starSpan.textContent = 0;
+        const langSpan = card.querySelector('.lang');
+        if (langSpan) langSpan.textContent = '未知';
       });
-    });
+  });
 });
