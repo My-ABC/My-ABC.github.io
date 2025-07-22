@@ -47,13 +47,3 @@ jobs:
           jq -s '.' public/repos/*.json > public/projects.json
           echo "生成结果："
           jq length public/projects.json
-
-  deploy:
-    needs: update
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/upload-pages-artifact@v2
-        with:
-          path: public/
-
-      - uses: actions/deploy-pages@v3
